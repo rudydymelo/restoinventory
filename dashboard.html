@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart RestoInventory Dashboard">
+    <title>Dashboard — Smart RestoInventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar-container"></aside>
+    <main class="main-content">
+        <header class="top-bar" id="topbar-container"></header>
+        <div class="page-content">
+
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <p>Your restaurant at a glance</p>
+            </div>
+
+            <!-- Metrics Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-3">
+                    <div class="metric-card">
+                        <div class="metric-icon blue"><i class="bi bi-box-seam"></i></div>
+                        <div class="metric-body">
+                            <div class="metric-value" id="statIngredients">—</div>
+                            <div class="metric-label">Ingredients</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="metric-card">
+                        <div class="metric-icon green"><i class="bi bi-journal-richtext"></i></div>
+                        <div class="metric-body">
+                            <div class="metric-value" id="statDishes">—</div>
+                            <div class="metric-label">Dishes on Menu</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="metric-card">
+                        <div class="metric-icon amber"><i class="bi bi-receipt"></i></div>
+                        <div class="metric-body">
+                            <div class="metric-value" id="statBills">—</div>
+                            <div class="metric-label">Bills Today</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="metric-card">
+                        <div class="metric-icon red"><i class="bi bi-exclamation-triangle"></i></div>
+                        <div class="metric-body">
+                            <div class="metric-value" id="statLowStock">—</div>
+                            <div class="metric-label">Low Stock Items</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Module Tiles -->
+            <div class="row g-3">
+                <div class="col-md-6 col-xl-3">
+                    <a href="inventory.html" class="dash-tile">
+                        <div class="dash-tile-icon ic-inventory"><i class="bi bi-box-seam"></i></div>
+                        <h5>Inventory</h5>
+                        <p>Track ingredients, monitor stock levels, and generate purchase orders</p>
+                        <div class="tile-footer" id="tileBadgeInv">Manage inventory →</div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="recipe.html" class="dash-tile">
+                        <div class="dash-tile-icon ic-recipe"><i class="bi bi-journal-richtext"></i></div>
+                        <h5>Recipe Menu</h5>
+                        <p>Build dishes, manage recipes, and set pricing for your menu</p>
+                        <div class="tile-footer">Build recipes →</div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="billing.html" class="dash-tile">
+                        <div class="dash-tile-icon ic-billing"><i class="bi bi-receipt"></i></div>
+                        <h5>Billing</h5>
+                        <p>Process orders, validate stock availability, and generate receipts</p>
+                        <div class="tile-footer">Create bills →</div>
+                    </a>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <a href="logs.html" class="dash-tile">
+                        <div class="dash-tile-icon ic-logs"><i class="bi bi-clock-history"></i></div>
+                        <h5>Activity Logs</h5>
+                        <p>View billing history, menu audits, and stock change records</p>
+                        <div class="tile-footer">View logs →</div>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/recipe.js"></script>
+<script src="js/billing.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!requireAuth()) return;
+        renderNavbar('Dashboard');
+
+        const ingredients = getAllIngredients();
+        const dishes = getAllDishes();
+        const bills = getAllBills();
+        const lowStock = getLowStockItems();
+        const today = new Date().toDateString();
+        const billsToday = bills.filter(b => new Date(b.timestamp).toDateString() === today);
+
+        document.getElementById('statIngredients').textContent = ingredients.length;
+        document.getElementById('statDishes').textContent = dishes.length;
+        document.getElementById('statBills').textContent = billsToday.length;
+
+        const lsEl = document.getElementById('statLowStock');
+        lsEl.textContent = lowStock.length;
+        if (lowStock.length > 0) lsEl.classList.add('metric-negative');
+
+        if (lowStock.length > 0) {
+            document.getElementById('tileBadgeInv').innerHTML = `<span class="badge bg-warning" style="font-size:0.7rem;">${lowStock.length} low stock</span> Manage inventory →`;
+        }
+    });
+</script>
+</body>
+</html>

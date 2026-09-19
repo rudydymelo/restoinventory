@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage restaurant ingredient inventory">
+    <title>Inventory — Smart RestoInventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar-container"></aside>
+    <main class="main-content">
+        <header class="top-bar" id="topbar-container"></header>
+        <div class="page-content">
+
+            <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <h1>Inventory</h1>
+                    <p>Track ingredients, monitor stock levels, and generate purchase orders</p>
+                </div>
+                <div class="d-flex gap-2 no-print">
+                    <button class="btn btn-outline-custom" onclick="openPurchaseOrder()">
+                        <i class="bi bi-cart-check me-1"></i> Purchase Order
+                    </button>
+                    <button class="btn btn-primary-custom" onclick="openAddForm()" data-bs-toggle="modal" data-bs-target="#ingredientModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add Ingredient
+                    </button>
+                </div>
+            </div>
+
+            <!-- Inventory Table -->
+            <div class="card-dark">
+                <div class="table-responsive">
+                    <table class="tbl" id="inventoryTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Quantity</th>
+                                <th>Unit</th>
+                                <th>Cost / Unit</th>
+                                <th>Status</th>
+                                <th class="no-print">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryBody"></tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="emptyState" style="display:none;">
+                    <span class="empty-state-icon">📦</span>
+                    <p>No ingredients added yet. Click "Add Ingredient" to get started.</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- Add/Edit Ingredient Modal -->
+<div class="modal fade" id="ingredientModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ingredientModalLabel">Add Ingredient</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ingredientForm" novalidate>
+                    <input type="hidden" id="editIngredientId">
+                    <div class="mb-3">
+                        <label for="ingName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="ingName" placeholder="e.g. Tomatoes" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="ingCategory" class="form-label">Category *</label>
+                            <select class="form-select" id="ingCategory" required>
+                                <option value="" disabled selected>Select</option>
+                                <option>Vegetables</option><option>Fruits</option><option>Dairy</option>
+                                <option>Meat</option><option>Seafood</option><option>Grains</option>
+                                <option>Oils</option><option>Spices</option><option>Beverages</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="ingUnit" class="form-label">Unit *</label>
+                            <select class="form-select" id="ingUnit" required>
+                                <option value="g">Grams (g)</option>
+                                <option value="mL">Millilitres (mL)</option>
+                                <option value="pcs">Pieces (pcs)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="ingQuantity" class="form-label">Quantity *</label>
+                            <input type="number" class="form-control" id="ingQuantity" placeholder="e.g. 5000" required min="0" step="any">
+                        </div>
+                        <div class="col-6">
+                            <label for="ingCostPerUnit" class="form-label">Cost per Unit (₹) *</label>
+                            <input type="number" class="form-control" id="ingCostPerUnit" placeholder="e.g. 0.04" required min="0" step="any">
+                            <div class="form-text">Per 1g / 1mL / 1pc</div>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label for="ingThreshold" class="form-label">Low Stock Threshold</label>
+                        <input type="number" class="form-control" id="ingThreshold" value="50" min="0" step="any">
+                        <div class="form-text">Alert when quantity falls below this</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary-custom" onclick="saveIngredient()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Purchase Order Modal -->
+<div class="modal fade" id="purchaseOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cart-check me-1"></i> Purchase Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="poBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-custom" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-primary-custom" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/inventory.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!requireAuth()) return;
+        renderNavbar('Inventory');
+        renderInventory();
+    });
+
+    function renderInventory() {
+        const items = getAllIngredients();
+        const tbody = document.getElementById('inventoryBody');
+        const empty = document.getElementById('emptyState');
+        if (!items.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        tbody.innerHTML = items.map((item, i) => `
+            <tr>
+                <td>${i+1}</td>
+                <td><strong>${item.name}</strong></td>
+                <td>${item.category}</td>
+                <td>${item.quantity}</td>
+                <td>${item.unit}</td>
+                <td>${formatCurrency(item.costPerUnit)}</td>
+                <td>${getStockBadge(item)}</td>
+                <td class="no-print">
+                    <button class="btn btn-ghost" onclick="openEditForm('${item.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-ghost text-red" onclick="confirmDelete('${item.id}','${item.name.replace(/'/g,"\\'")}')" title="Delete"><i class="bi bi-trash3"></i></button>
+                </td>
+            </tr>`).join('');
+    }
+
+    function openAddForm() {
+        document.getElementById('ingredientModalLabel').textContent = 'Add Ingredient';
+        document.getElementById('ingredientForm').reset();
+        document.getElementById('editIngredientId').value = '';
+        document.getElementById('ingThreshold').value = 50;
+    }
+
+    function openEditForm(id) {
+        const item = getIngredientById(id); if (!item) return;
+        document.getElementById('ingredientModalLabel').textContent = 'Edit Ingredient';
+        document.getElementById('editIngredientId').value = id;
+        document.getElementById('ingName').value = item.name;
+        document.getElementById('ingCategory').value = item.category;
+        document.getElementById('ingUnit').value = item.unit;
+        document.getElementById('ingQuantity').value = item.quantity;
+        document.getElementById('ingCostPerUnit').value = item.costPerUnit;
+        document.getElementById('ingThreshold').value = item.lowStockThreshold || 50;
+        new bootstrap.Modal(document.getElementById('ingredientModal')).show();
+    }
+
+    function saveIngredient() {
+        const id = document.getElementById('editIngredientId').value;
+        const data = {
+            name: document.getElementById('ingName').value.trim(),
+            category: document.getElementById('ingCategory').value,
+            quantity: document.getElementById('ingQuantity').value,
+            unit: document.getElementById('ingUnit').value,
+            costPerUnit: document.getElementById('ingCostPerUnit').value,
+            lowStockThreshold: document.getElementById('ingThreshold').value
+        };
+        if (!data.name || !data.category || data.quantity==='' || data.costPerUnit==='') {
+            showToast('Please fill all required fields.','danger'); return;
+        }
+        if (id) { updateIngredient(id, data); showToast(data.name + ' updated.','success'); }
+        else { addIngredient(data); showToast(data.name + ' added to inventory.','success'); }
+        bootstrap.Modal.getInstance(document.getElementById('ingredientModal')).hide();
+        renderInventory();
+    }
+
+    function confirmDelete(id, name) {
+        if (confirm('Delete "' + name + '" from inventory?')) {
+            deleteIngredient(id); showToast(name + ' removed.','danger'); renderInventory();
+        }
+    }
+
+    function openPurchaseOrder() {
+        const po = generatePurchaseOrder();
+        const body = document.getElementById('poBody');
+        if (!po.length) {
+            body.innerHTML = '<div class="empty-state"><span class="empty-state-icon">✅</span><p>All stock levels healthy. No purchase order needed.</p></div>';
+        } else {
+            const total = po.reduce((s,i)=>s+i.estimatedCost,0);
+            body.innerHTML = `<div class="table-responsive"><table class="tbl">
+                <thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Order Qty</th><th>Est. Cost</th></tr></thead>
+                <tbody>${po.map(i=>`<tr><td><strong>${i.name}</strong></td><td>${i.category}</td><td>${i.quantity} ${i.unit}</td><td class="text-amber fw-600">${i.requiredQty} ${i.unit}</td><td>${formatCurrency(i.estimatedCost)}</td></tr>`).join('')}</tbody>
+                <tfoot><tr><td colspan="4" class="text-end fw-600" style="border:none">Total:</td><td class="fw-600 text-blue" style="border:none">${formatCurrency(total)}</td></tr></tfoot>
+            </table></div>`;
+        }
+        new bootstrap.Modal(document.getElementById('purchaseOrderModal')).show();
+    }
+</script>
+</body>
+</html>

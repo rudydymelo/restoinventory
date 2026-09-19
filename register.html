@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Register your restaurant on Smart RestoInventory">
+    <title>Register — Smart RestoInventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="auth-wrapper">
+    <div class="auth-card wide">
+        <div class="auth-brand">
+            <span class="auth-brand-icon">🍽️</span>
+            <h1>Register Your Restaurant</h1>
+            <p>Create an account to start managing your restaurant</p>
+        </div>
+
+        <form id="registerForm" novalidate>
+
+            <!-- Account Credentials -->
+            <div class="auth-section-label"><i class="bi bi-shield-lock me-1"></i> Account Credentials</div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label for="regUsername" class="form-label">Username *</label>
+                    <input type="text" class="form-control" id="regUsername" placeholder="Choose a username" required minlength="3">
+                </div>
+                <div class="col-md-4">
+                    <label for="regPassword" class="form-label">Password *</label>
+                    <input type="password" class="form-control" id="regPassword" placeholder="Min 4 characters" required minlength="4">
+                </div>
+                <div class="col-md-4">
+                    <label for="regConfirmPassword" class="form-label">Confirm Password *</label>
+                    <input type="password" class="form-control" id="regConfirmPassword" placeholder="Re-enter password" required>
+                </div>
+            </div>
+
+            <!-- Business Information -->
+            <div class="auth-section-label"><i class="bi bi-building me-1"></i> Business Information</div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="regRestaurantName" class="form-label">Restaurant / Business Name *</label>
+                    <input type="text" class="form-control" id="regRestaurantName" placeholder="e.g. The Grand Kitchen" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regOwnerName" class="form-label">Owner Full Name *</label>
+                    <input type="text" class="form-control" id="regOwnerName" placeholder="e.g. Raj Sharma" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regEmail" class="form-label">Email *</label>
+                    <input type="email" class="form-control" id="regEmail" placeholder="owner@restaurant.com" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regPhone" class="form-label">Phone Number *</label>
+                    <input type="tel" class="form-control" id="regPhone" placeholder="10-digit number" required pattern="^[6-9]\d{9}$">
+                </div>
+            </div>
+
+            <!-- Address -->
+            <div class="auth-section-label"><i class="bi bi-geo-alt me-1"></i> Address</div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="regStreet" class="form-label">Street *</label>
+                    <input type="text" class="form-control" id="regStreet" placeholder="Street address" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regCity" class="form-label">City *</label>
+                    <input type="text" class="form-control" id="regCity" placeholder="City" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regState" class="form-label">State *</label>
+                    <input type="text" class="form-control" id="regState" placeholder="State" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regPincode" class="form-label">Pincode *</label>
+                    <input type="text" class="form-control" id="regPincode" placeholder="6-digit pincode" required pattern="^\d{6}$">
+                </div>
+            </div>
+
+            <!-- Compliance -->
+            <div class="auth-section-label"><i class="bi bi-file-earmark-check me-1"></i> Compliance</div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="regFssai" class="form-label">FSSAI License Number *</label>
+                    <input type="text" class="form-control" id="regFssai" placeholder="14-digit FSSAI number" required pattern="^\d{14}$">
+                    <div class="form-text">Exactly 14 digits</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="regGstin" class="form-label">GSTIN *</label>
+                    <input type="text" class="form-control" id="regGstin" placeholder="15-char GSTIN" required
+                           pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$" style="text-transform:uppercase;">
+                    <div class="form-text">e.g. 27AAPFU0939F1ZV</div>
+                </div>
+            </div>
+
+            <!-- Restaurant Details -->
+            <div class="auth-section-label"><i class="bi bi-shop me-1"></i> Restaurant Details</div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label for="regRestaurantType" class="form-label">Type *</label>
+                    <select class="form-select" id="regRestaurantType" required>
+                        <option value="" disabled selected>Select type</option>
+                        <option value="Veg">Veg</option>
+                        <option value="Non-Veg">Non-Veg</option>
+                        <option value="Both">Both</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="regSeatingCapacity" class="form-label">Seating Capacity *</label>
+                    <input type="number" class="form-control" id="regSeatingCapacity" placeholder="e.g. 50" required min="1">
+                </div>
+                <div class="col-md-4">
+                    <label for="regCuisineType" class="form-label">Cuisine Type</label>
+                    <select class="form-select" id="regCuisineType">
+                        <option value="">Select (optional)</option>
+                        <option value="North Indian">North Indian</option>
+                        <option value="South Indian">South Indian</option>
+                        <option value="Chinese">Chinese</option>
+                        <option value="Italian">Italian</option>
+                        <option value="Continental">Continental</option>
+                        <option value="Multi-Cuisine">Multi-Cuisine</option>
+                        <option value="Street Food">Street Food</option>
+                        <option value="Cafe">Cafe / Bakery</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="regOpeningTime" class="form-label">Opening Time *</label>
+                    <input type="time" class="form-control" id="regOpeningTime" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="regClosingTime" class="form-label">Closing Time *</label>
+                    <input type="time" class="form-control" id="regClosingTime" required>
+                </div>
+            </div>
+
+            <div id="registerError" class="error-inline mb-3">
+                <i class="bi bi-exclamation-circle"></i> <span id="registerErrorText"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary-custom w-100 py-2 mb-3">
+                <i class="bi bi-check-circle me-1"></i> Register Restaurant
+            </button>
+
+            <div class="text-center">
+                <a href="index.html" class="small">← Already have an account? Sign in</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const errEl = document.getElementById('registerError');
+        const errT = document.getElementById('registerErrorText');
+        const show = (m) => { errT.textContent = m; errEl.classList.add('visible'); };
+        const clear = () => errEl.classList.remove('visible');
+
+        const v = (id) => document.getElementById(id).value.trim();
+        const username = v('regUsername'), password = v('regPassword'), confirmPassword = v('regConfirmPassword');
+        const restaurantName = v('regRestaurantName'), ownerName = v('regOwnerName');
+        const email = v('regEmail'), phone = v('regPhone');
+        const street = v('regStreet'), city = v('regCity'), state = v('regState'), pincode = v('regPincode');
+        const fssai = v('regFssai'), gstin = v('regGstin').toUpperCase();
+        const restaurantType = document.getElementById('regRestaurantType').value;
+        const seatingCapacity = parseInt(document.getElementById('regSeatingCapacity').value) || 0;
+        const openingTime = v('regOpeningTime'), closingTime = v('regClosingTime');
+        const cuisineType = document.getElementById('regCuisineType').value;
+
+        if (!username || username.length < 3) return show('Username must be at least 3 characters.');
+        if (!password || password.length < 4) return show('Password must be at least 4 characters.');
+        if (password !== confirmPassword) return show('Passwords do not match.');
+        if (!restaurantName) return show('Restaurant name is required.');
+        if (!ownerName) return show('Owner name is required.');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return show('Enter a valid email address.');
+        if (!/^[6-9]\d{9}$/.test(phone)) return show('Enter a valid 10-digit phone number.');
+        if (!street || !city || !state) return show('Complete address is required.');
+        if (!/^\d{6}$/.test(pincode)) return show('Pincode must be exactly 6 digits.');
+        if (!/^\d{14}$/.test(fssai)) return show('FSSAI number must be exactly 14 digits.');
+        if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) return show('Enter a valid 15-character GSTIN.');
+        if (!restaurantType) return show('Select a restaurant type.');
+        if (seatingCapacity < 1) return show('Seating capacity must be at least 1.');
+        if (!openingTime || !closingTime) return show('Opening and closing times are required.');
+
+        clear();
+        const result = registerUser({
+            username, password, restaurantName, ownerName, email, phone,
+            address: { street, city, state, pincode },
+            fssai, gstin, restaurantType, seatingCapacity, openingTime, closingTime, cuisineType
+        });
+
+        if (result.success) window.location.href = 'index.html?registered=true';
+        else show(result.message);
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Process orders and generate bills">
+    <title>Billing — Smart RestoInventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar-container"></aside>
+    <main class="main-content">
+        <header class="top-bar" id="topbar-container"></header>
+        <div class="page-content">
+
+            <div class="page-header">
+                <h1>Billing</h1>
+                <p>Process orders, validate stock availability, and generate receipts</p>
+            </div>
+
+            <div class="row g-4">
+                <!-- Order Form -->
+                <div class="col-lg-7">
+                    <div class="card-dark">
+                        <div class="card-dark-header">
+                            <h5><i class="bi bi-cart3 me-1"></i> New Order</h5>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tableNumber" class="form-label">Table Number *</label>
+                            <input type="number" class="form-control" id="tableNumber" placeholder="e.g. 5" min="1" required style="max-width:200px;">
+                        </div>
+                        <label class="form-label">Order Items</label>
+                        <div id="orderItems"></div>
+                        <button type="button" class="btn btn-outline-custom btn-sm mt-2 mb-3" onclick="addOrderItem()">
+                            <i class="bi bi-plus me-1"></i> Add Item
+                        </button>
+                        <div class="d-flex gap-2 pt-3" style="border-top:1px solid var(--border)">
+                            <button class="btn btn-primary-custom" onclick="generateBill()">
+                                <i class="bi bi-receipt me-1"></i> Generate Bill
+                            </button>
+                            <button class="btn btn-outline-custom" onclick="clearOrder()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Bills -->
+                <div class="col-lg-5">
+                    <div class="card-dark">
+                        <div class="card-dark-header">
+                            <h5><i class="bi bi-clock-history me-1"></i> Recent Bills</h5>
+                        </div>
+                        <div id="recentBills"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- Stock Error Modal -->
+<div class="modal fade" id="stockErrorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom-color:var(--red)">
+                <h5 class="modal-title text-red"><i class="bi bi-exclamation-triangle me-1"></i> Insufficient Stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="stockErrorBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-custom" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> Bill Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="receiptBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-custom" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-primary-custom" id="confirmPayBtn">
+                    <i class="bi bi-check-circle me-1"></i> Confirm Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/recipe.js"></script>
+<script src="js/billing.js"></script>
+<script>
+    let pendingBill = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!requireAuth()) return;
+        renderNavbar('Billing');
+        addOrderItem();
+        renderRecentBills();
+    });
+
+    function getDishOptions(sel) {
+        const dishes = getAllDishes();
+        return '<option value="" disabled '+(sel?'':'selected')+'>Select dish</option>' +
+            dishes.map(d=>`<option value="${d.id}" ${d.id===sel?'selected':''}>${d.dishName} — ${formatCurrency(d.price)}</option>`).join('');
+    }
+
+    function addOrderItem(dishId, qty) {
+        const div = document.createElement('div');
+        div.className = 'order-item-row d-flex gap-2 align-items-center';
+        div.innerHTML = `<select class="form-select form-select-sm order-dish" style="flex:3" required>${getDishOptions(dishId||'')}</select>
+            <input type="number" class="form-control form-control-sm order-qty" placeholder="Qty" min="1" value="${qty||1}" style="flex:1" required>
+            <button type="button" class="btn btn-ghost btn-sm text-red" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>`;
+        document.getElementById('orderItems').appendChild(div);
+    }
+
+    function clearOrder() {
+        document.getElementById('tableNumber').value = '';
+        document.getElementById('orderItems').innerHTML = '';
+        addOrderItem();
+    }
+
+    function generateBill() {
+        const tableNum = parseInt(document.getElementById('tableNumber').value);
+        if (!tableNum || tableNum < 1) { showToast('Enter a valid table number.','danger'); return; }
+
+        const rows = document.getElementById('orderItems').querySelectorAll('.order-item-row');
+        const items = [];
+        let valid = true;
+        rows.forEach(r => {
+            const dishId = r.querySelector('.order-dish').value;
+            const qty = parseInt(r.querySelector('.order-qty').value);
+            if (!dishId || !qty || qty < 1) { valid = false; return; }
+            const dish = getRecipeById(dishId);
+            if (!dish) { valid = false; return; }
+            items.push({ dishId, dishName: dish.dishName, qty, priceAtSale: dish.price });
+        });
+
+        if (!valid || !items.length) { showToast('Add at least one dish with valid quantity.','danger'); return; }
+
+        // Stock validation
+        const errors = [];
+        items.forEach(item => {
+            const check = checkStockAvailability(item.dishId, item.qty);
+            if (!check.available) errors.push(check.message);
+        });
+
+        if (errors.length) {
+            document.getElementById('stockErrorBody').innerHTML = errors.map(e =>
+                `<div class="d-flex align-items-start gap-2 mb-2"><i class="bi bi-exclamation-circle text-red mt-1"></i><span>${e}</span></div>`
+            ).join('');
+            new bootstrap.Modal(document.getElementById('stockErrorModal')).show();
+            return;
+        }
+
+        // All stock OK — show receipt preview
+        const totals = calculateTotal(items);
+        pendingBill = { tableNumber: tableNum, items, ...totals };
+
+        const session = getSession();
+        document.getElementById('receiptBody').innerHTML = `
+            <div class="receipt-view">
+                <h5>${session ? session.restaurantName : 'Smart RestoInventory'}</h5>
+                <table>
+                    <tr><td>Table:</td><td class="text-end">${tableNum}</td></tr>
+                    <tr><td>Date:</td><td class="text-end">${new Date().toLocaleDateString('en-IN')}</td></tr>
+                </table>
+                <hr style="border-style:dashed;border-color:#ccc;">
+                <table>
+                    <thead><tr><th style="text-align:left">Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Amt</th></tr></thead>
+                    <tbody>${items.map(i=>`<tr><td>${i.dishName}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${formatCurrency(i.priceAtSale*i.qty)}</td></tr>`).join('')}</tbody>
+                </table>
+                <hr style="border-style:dashed;border-color:#ccc;">
+                <table>
+                    <tr><td>Subtotal</td><td class="text-end">${formatCurrency(totals.subtotal)}</td></tr>
+                    <tr><td>GST (5%)</td><td class="text-end">${formatCurrency(totals.tax)}</td></tr>
+                </table>
+                <div class="receipt-total d-flex justify-content-between">
+                    <span>TOTAL</span><span>${formatCurrency(totals.total)}</span>
+                </div>
+            </div>`;
+
+        new bootstrap.Modal(document.getElementById('receiptModal')).show();
+    }
+
+    // Confirm payment
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'confirmPayBtn' || e.target.closest('#confirmPayBtn')) {
+            if (!pendingBill) return;
+            // Deduct stock
+            pendingBill.items.forEach(item => deductStockAndNotify(item.dishId, item.qty));
+            // Save bill
+            createBill(pendingBill);
+            // Close modal and reset
+            bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
+            showToast('Payment confirmed! Bill saved.','success');
+            clearOrder();
+            renderRecentBills();
+            pendingBill = null;
+        }
+    });
+
+    function renderRecentBills() {
+        const bills = getAllBills().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,8);
+        const el = document.getElementById('recentBills');
+        if (!bills.length) { el.innerHTML = '<p class="small" style="color:var(--text-muted)">No bills yet.</p>'; return; }
+        el.innerHTML = `<div class="table-responsive"><table class="tbl">
+            <thead><tr><th>Table</th><th>Items</th><th>Total</th><th>Time</th></tr></thead>
+            <tbody>${bills.map(b=>`<tr>
+                <td>${b.tableNumber}</td>
+                <td>${b.items.map(i=>i.dishName+' ×'+i.qty).join(', ')}</td>
+                <td class="fw-600">${formatCurrency(b.total)}</td>
+                <td class="small" style="color:var(--text-muted)">${formatDate(b.timestamp)}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    }
+</script>
+</body>
+</html>
