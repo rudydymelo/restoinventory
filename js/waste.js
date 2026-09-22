@@ -4,12 +4,12 @@
  */
 
 /**
- * Log a waste event: deducts from inventory and records to waste[].
+ * Log a manual waste event: deducts from inventory and records to waste[].
  * @param {Object} data - { inventoryId, qty, reason }
  * @returns {Object} The created waste record
  */
 function logWaste(data) {
-    data.qty = parseFloat(data.qty) || 0;
+    data.qty       = parseFloat(data.qty) || 0;
     data.timestamp = new Date().toISOString();
 
     // Deduct from inventory
@@ -17,16 +17,22 @@ function logWaste(data) {
     if (invItem) {
         const newQty = Math.max(0, invItem.quantity - data.qty);
         Storage.updateItem('inventory', data.inventoryId, { quantity: newQty });
-        data.itemName = invItem.name;
+        data.itemName   = invItem.name;
+        data.unit       = invItem.unit;
+        data.costPerUnit = invItem.costPerUnit;
     } else {
         data.itemName = data.itemName || 'Unknown';
+        data.unit     = data.unit || '';
     }
 
-    const entry = Storage.addItem('waste', data);
-    logActivity('waste', `Wasted ${data.qty}${invItem ? invItem.unit : ''} of ${data.itemName}: ${data.reason}`, {
-        wasteId: entry.id,
-        inventoryId: data.inventoryId
-    });
+    const entry      = Storage.addItem('waste', data);
+    const estLoss    = data.qty * (data.costPerUnit || 0);
+    const unitLabel  = invItem ? invItem.unit : '';
+
+    logActivity('waste',
+        `Waste recorded: ${data.qty}${unitLabel} of "${data.itemName}" disposed of. Reason: "${data.reason}". Estimated loss: ${formatCurrency(estLoss)}.`,
+        { wasteId: entry.id, inventoryId: data.inventoryId }
+    );
     return entry;
 }
 
@@ -43,19 +49,19 @@ function getAllWaste() {
  * @returns {{ byItem: Object, totalWasteCost: number, totalEntries: number }}
  */
 function getWasteSummary() {
-    const waste = Storage.getAll('waste');
-    const byItem = {};
+    const waste        = Storage.getAll('waste');
+    const byItem       = {};
     let totalWasteCost = 0;
 
     waste.forEach(w => {
         if (!byItem[w.inventoryId]) {
             const inv = getIngredientById(w.inventoryId);
             byItem[w.inventoryId] = {
-                itemName: w.itemName,
-                totalQty: 0,
-                unit: inv ? inv.unit : '',
-                costPerUnit: inv ? inv.costPerUnit : 0,
-                totalCost: 0
+                itemName:    w.itemName,
+                totalQty:    0,
+                unit:        inv ? inv.unit : (w.unit || ''),
+                costPerUnit: inv ? inv.costPerUnit : (w.costPerUnit || 0),
+                totalCost:   0
             };
         }
         byItem[w.inventoryId].totalQty += w.qty;

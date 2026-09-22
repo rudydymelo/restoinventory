@@ -9,13 +9,22 @@
  * @returns {Object} The created recipe record
  */
 function addDish(data) {
-    data.price = parseFloat(data.price) || 0;
+    data.price       = parseFloat(data.price) || 0;
     data.ingredients = (data.ingredients || []).map(ing => ({
         inventoryId: ing.inventoryId,
         qtyRequired: parseFloat(ing.qtyRequired) || 0
     }));
-    const item = Storage.addItem('recipes', data);
-    logActivity('menu', `Added dish: ${data.dishName} (${formatCurrency(data.price)})`, { dishId: item.id });
+
+    const item           = Storage.addItem('recipes', data);
+    const ingNames       = data.ingredients.map(ing => {
+        const inv = getIngredientById(ing.inventoryId);
+        return inv ? `${ing.qtyRequired}${inv.unit} ${inv.name}` : `${ing.qtyRequired} (unknown)`;
+    }).join(', ');
+
+    logActivity('menu',
+        `New dish added to menu: "${data.dishName}" (${data.category}) — priced at ${formatCurrency(data.price)}. Uses ${data.ingredients.length} ingredient(s): ${ingNames}.`,
+        { dishId: item.id }
+    );
     return item;
 }
 
@@ -34,7 +43,10 @@ function editDish(id, data) {
         }));
     }
     const item = Storage.updateItem('recipes', id, data);
-    if (item) logActivity('menu', `Updated dish: ${item.dishName}`, { dishId: id, changes: data });
+    if (item) logActivity('menu',
+        `Menu dish updated: "${item.dishName}" (${item.category}) — price is now ${formatCurrency(item.price)}, uses ${item.ingredients.length} ingredient(s).`,
+        { dishId: id }
+    );
     return item;
 }
 
@@ -45,8 +57,11 @@ function editDish(id, data) {
  */
 function deleteDish(id) {
     const item = Storage.findById('recipes', id);
-    const ok = Storage.deleteItem('recipes', id);
-    if (item) logActivity('menu', `Deleted dish: ${item.dishName}`, { dishId: id });
+    const ok   = Storage.deleteItem('recipes', id);
+    if (item) logActivity('menu',
+        `Dish removed from menu: "${item.dishName}" (${item.category}, ${formatCurrency(item.price)}) — no longer available for ordering.`,
+        { dishId: id }
+    );
     return ok;
 }
 

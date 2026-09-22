@@ -8,6 +8,24 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <style>
+        .batch-table { font-size: 0.82rem; }
+        .batch-table th, .batch-table td { padding: 6px 10px; }
+        .section-divider {
+            border: none;
+            border-top: 1px solid var(--border-color, #333);
+            margin: 18px 0 14px;
+        }
+        .section-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        .remove-form-row td { background: var(--surface-2, #1e1e2e); padding: 8px 10px; }
+    </style>
 </head>
 <body>
 <div class="app-layout">
@@ -19,7 +37,7 @@
             <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     <h1>Inventory</h1>
-                    <p>Track ingredients, monitor stock levels, and generate purchase orders</p>
+                    <p>Track ingredients, monitor stock levels, and manage batch expiry dates</p>
                 </div>
                 <div class="d-flex gap-2 no-print">
                     <button class="btn btn-outline-custom" onclick="openPurchaseOrder()">
@@ -40,10 +58,11 @@
                                 <th>#</th>
                                 <th>Name</th>
                                 <th>Category</th>
-                                <th>Quantity</th>
-                                <th>Unit</th>
+                                <th>Total Qty</th>
                                 <th>Cost / Unit</th>
-                                <th>Status</th>
+                                <th>Batches</th>
+                                <th>Nearest Expiry</th>
+                                <th>Stock Status</th>
                                 <th class="no-print">Actions</th>
                             </tr>
                         </thead>
@@ -60,9 +79,11 @@
     </main>
 </div>
 
-<!-- Add/Edit Ingredient Modal -->
+<!-- ═══════════════════════════════════════════════
+     Add / Edit Ingredient Modal
+═══════════════════════════════════════════════ -->
 <div class="modal fade" id="ingredientModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="ingredientModalLabel">Add Ingredient</h5>
@@ -71,12 +92,14 @@
             <div class="modal-body">
                 <form id="ingredientForm" novalidate>
                     <input type="hidden" id="editIngredientId">
-                    <div class="mb-3">
-                        <label for="ingName" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="ingName" placeholder="e.g. Tomatoes" required>
-                    </div>
+
+                    <!-- ── Always-visible detail fields ── -->
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
+                        <div class="col-12 col-md-6">
+                            <label for="ingName" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="ingName" placeholder="e.g. Tomatoes" required>
+                        </div>
+                        <div class="col-6 col-md-3">
                             <label for="ingCategory" class="form-label">Category *</label>
                             <select class="form-select" id="ingCategory" required>
                                 <option value="" disabled selected>Select</option>
@@ -85,42 +108,84 @@
                                 <option>Oils</option><option>Spices</option><option>Beverages</option><option>Other</option>
                             </select>
                         </div>
-                        <div class="col-6">
+                        <div class="col-6 col-md-3">
                             <label for="ingUnit" class="form-label">Unit *</label>
                             <select class="form-select" id="ingUnit" required>
                                 <option value="g">Grams (g)</option>
                                 <option value="mL">Millilitres (mL)</option>
                                 <option value="pcs">Pieces (pcs)</option>
+                                <option value="kg">Kilograms (kg)</option>
+                                <option value="L">Litres (L)</option>
                             </select>
                         </div>
                     </div>
                     <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <label for="ingQuantity" class="form-label">Quantity *</label>
-                            <input type="number" class="form-control" id="ingQuantity" placeholder="e.g. 5000" required min="0" step="any">
-                        </div>
-                        <div class="col-6">
                             <label for="ingCostPerUnit" class="form-label">Cost per Unit (₹) *</label>
                             <input type="number" class="form-control" id="ingCostPerUnit" placeholder="e.g. 0.04" required min="0" step="any">
-                            <div class="form-text">Per 1g / 1mL / 1pc</div>
+                            <div class="form-text">Per 1 g / 1 mL / 1 pc</div>
+                        </div>
+                        <div class="col-6">
+                            <label for="ingThreshold" class="form-label">Low Stock Threshold</label>
+                            <input type="number" class="form-control" id="ingThreshold" value="50" min="0" step="any">
+                            <div class="form-text">Alert when quantity falls below this</div>
                         </div>
                     </div>
-                    <div class="mb-0">
-                        <label for="ingThreshold" class="form-label">Low Stock Threshold</label>
-                        <input type="number" class="form-control" id="ingThreshold" value="50" min="0" step="any">
-                        <div class="form-text">Alert when quantity falls below this</div>
+
+                    <!-- ── ADD MODE: Initial stock + expiry ── -->
+                    <div id="addFields">
+                        <hr class="section-divider">
+                        <p class="section-label">Initial Stock Batch</p>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label for="ingQuantity" class="form-label">Quantity *</label>
+                                <input type="number" class="form-control" id="ingQuantity" placeholder="e.g. 5000" min="0" step="any">
+                            </div>
+                            <div class="col-6">
+                                <label for="ingExpiryDate" class="form-label">Expiry Date *</label>
+                                <input type="date" class="form-control" id="ingExpiryDate">
+                                <div class="form-text">Required — when does this batch expire?</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── EDIT MODE: Batch list + add new batch ── -->
+                    <div id="editBatchSection" style="display:none;">
+                        <hr class="section-divider">
+                        <p class="section-label">Current Stock Batches</p>
+                        <div id="batchesTableContainer" class="mb-3"></div>
+
+                        <hr class="section-divider">
+                        <p class="section-label">Add New Stock Batch</p>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-5">
+                                <label for="newBatchQty" class="form-label">Quantity to Add</label>
+                                <input type="number" class="form-control" id="newBatchQty" placeholder="e.g. 2000" min="1" step="any">
+                            </div>
+                            <div class="col-5">
+                                <label for="newBatchExpiry" class="form-label">Expiry Date</label>
+                                <input type="date" class="form-control" id="newBatchExpiry">
+                            </div>
+                            <div class="col-2">
+                                <button type="button" class="btn btn-primary-custom w-100" onclick="addNewBatch()">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-primary-custom" onclick="saveIngredient()">Save</button>
+                <button class="btn btn-primary-custom" onclick="saveIngredient()">Save Details</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Purchase Order Modal -->
+<!-- ═══════════════════════════════════════════════
+     Purchase Order Modal
+═══════════════════════════════════════════════ -->
 <div class="modal fade" id="purchaseOrderModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -144,91 +209,250 @@
 <script src="js/logs.js"></script>
 <script src="js/inventory.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // ─── Page Init ───────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
         if (!requireAuth()) return;
         renderNavbar('Inventory');
+        checkExpiryAndAutoWaste();   // scan for expired batches every page load
         renderInventory();
     });
 
+    // ─── Main Table ──────────────────────────────────────────────────
     function renderInventory() {
         const items = getAllIngredients();
         const tbody = document.getElementById('inventoryBody');
         const empty = document.getElementById('emptyState');
-        if (!items.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+
+        if (!items.length) {
+            tbody.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
         empty.style.display = 'none';
-        tbody.innerHTML = items.map((item, i) => `
+
+        tbody.innerHTML = items.map((item, i) => {
+            const batchCount = (item.batches || []).length;
+            const batchLabel = batchCount > 0
+                ? `<span class="badge bg-secondary">${batchCount} batch${batchCount > 1 ? 'es' : ''}</span>`
+                : '<span class="text-muted small">—</span>';
+            return `
             <tr>
-                <td>${i+1}</td>
+                <td>${i + 1}</td>
                 <td><strong>${item.name}</strong></td>
                 <td>${item.category}</td>
-                <td>${item.quantity}</td>
-                <td>${item.unit}</td>
+                <td>${item.quantity} ${item.unit}</td>
                 <td>${formatCurrency(item.costPerUnit)}</td>
+                <td>${batchLabel}</td>
+                <td>${getExpiryBadge(item)}</td>
                 <td>${getStockBadge(item)}</td>
                 <td class="no-print">
-                    <button class="btn btn-ghost" onclick="openEditForm('${item.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-ghost text-red" onclick="confirmDelete('${item.id}','${item.name.replace(/'/g,"\\'")}')" title="Delete"><i class="bi bi-trash3"></i></button>
+                    <button class="btn btn-ghost" onclick="openEditForm('${item.id}')" title="Edit / Manage Batches">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-ghost text-red" onclick="confirmDelete('${item.id}','${item.name.replace(/'/g, "\\'")}')" title="Delete">
+                        <i class="bi bi-trash3"></i>
+                    </button>
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     }
 
+    // ─── Add Form ────────────────────────────────────────────────────
     function openAddForm() {
-        document.getElementById('ingredientModalLabel').textContent = 'Add Ingredient';
+        document.getElementById('ingredientModalLabel').textContent = 'Add New Ingredient';
         document.getElementById('ingredientForm').reset();
         document.getElementById('editIngredientId').value = '';
         document.getElementById('ingThreshold').value = 50;
+        document.getElementById('addFields').style.display = 'block';
+        document.getElementById('editBatchSection').style.display = 'none';
     }
 
+    // ─── Edit Form ───────────────────────────────────────────────────
     function openEditForm(id) {
-        const item = getIngredientById(id); if (!item) return;
-        document.getElementById('ingredientModalLabel').textContent = 'Edit Ingredient';
+        const item = getIngredientById(id);
+        if (!item) return;
+
+        document.getElementById('ingredientModalLabel').textContent = 'Edit Ingredient — ' + item.name;
         document.getElementById('editIngredientId').value = id;
-        document.getElementById('ingName').value = item.name;
-        document.getElementById('ingCategory').value = item.category;
-        document.getElementById('ingUnit').value = item.unit;
-        document.getElementById('ingQuantity').value = item.quantity;
-        document.getElementById('ingCostPerUnit').value = item.costPerUnit;
-        document.getElementById('ingThreshold').value = item.lowStockThreshold || 50;
+        document.getElementById('ingName').value         = item.name;
+        document.getElementById('ingCategory').value     = item.category;
+        document.getElementById('ingUnit').value         = item.unit;
+        document.getElementById('ingCostPerUnit').value  = item.costPerUnit;
+        document.getElementById('ingThreshold').value    = item.lowStockThreshold || 50;
+
+        document.getElementById('addFields').style.display        = 'none';
+        document.getElementById('editBatchSection').style.display = 'block';
+
+        renderBatchesTable(id);
+        document.getElementById('newBatchQty').value    = '';
+        document.getElementById('newBatchExpiry').value = '';
+
         new bootstrap.Modal(document.getElementById('ingredientModal')).show();
     }
 
+    // ─── Batch Table (inside edit modal) ─────────────────────────────
+    function renderBatchesTable(itemId) {
+        const item    = getIngredientById(itemId);
+        const batches = item ? (item.batches || []) : [];
+        const el      = document.getElementById('batchesTableContainer');
+
+        if (!batches.length) {
+            el.innerHTML = '<p class="text-muted small mb-0">No batches on record for this ingredient. Use the form below to add stock.</p>';
+            return;
+        }
+
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        let rows = '';
+
+        batches.forEach(function (b) {
+            var expLabel = '—';
+            var statusBadge = '<span class="badge bg-secondary">No Expiry</span>';
+            if (b.expiryDate) {
+                var exp = new Date(b.expiryDate); exp.setHours(0,0,0,0);
+                var days = Math.ceil((exp - today) / 86400000);
+                expLabel = b.expiryDate;
+                if      (days < 0)  statusBadge = '<span class="badge bg-danger">Expired</span>';
+                else if (days === 0) statusBadge = '<span class="badge bg-danger">Expires Today</span>';
+                else if (days <= 3) statusBadge = '<span class="badge bg-warning text-dark">Expires in ' + days + 'd</span>';
+                else                statusBadge = '<span class="badge bg-success">OK</span>';
+            }
+
+            // Main row
+            rows += '<tr>' +
+                '<td>' + formatDateShort(b.addedOn) + '</td>' +
+                '<td>' + expLabel + '</td>' +
+                '<td class="fw-600">' + b.qty + ' ' + item.unit + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td><button class="btn btn-ghost text-red btn-sm" onclick="toggleRemoveForm(\'' + b.batchId + '\')" title="Remove stock from this batch"><i class="bi bi-dash-circle"></i> Remove</button></td>' +
+                '</tr>';
+
+            // Hidden remove form row
+            rows += '<tr class="remove-form-row" id="removeFormRow_' + b.batchId + '" style="display:none;">' +
+                '<td colspan="5">' +
+                '<div class="d-flex gap-2 align-items-center flex-wrap">' +
+                '<div>' +
+                '<label class="form-label mb-1" style="font-size:0.78rem">Qty to remove (max ' + b.qty + ' ' + item.unit + ')</label>' +
+                '<input type="number" id="removeQty_' + b.batchId + '" class="form-control form-control-sm" style="width:120px" min="1" max="' + b.qty + '" step="any" placeholder="Qty">' +
+                '</div>' +
+                '<div class="flex-grow-1">' +
+                '<label class="form-label mb-1" style="font-size:0.78rem">Reason for removal *</label>' +
+                '<input type="text" id="removeReason_' + b.batchId + '" class="form-control form-control-sm" placeholder="e.g. Damaged, Spillage, Correction…">' +
+                '</div>' +
+                '<div class="d-flex gap-1 align-self-end">' +
+                '<button type="button" class="btn btn-danger btn-sm" onclick="confirmRemoveBatch(\'' + itemId + '\', \'' + b.batchId + '\', ' + b.qty + ')">Confirm</button>' +
+                '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleRemoveForm(\'' + b.batchId + '\')">Cancel</button>' +
+                '</div>' +
+                '</div>' +
+                '</td>' +
+                '</tr>';
+        });
+
+        el.innerHTML = '<div class="table-responsive"><table class="tbl batch-table mb-0">' +
+            '<thead><tr><th>Added On</th><th>Expiry Date</th><th>Qty</th><th>Status</th><th></th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
+    }
+
+    function toggleRemoveForm(batchId) {
+        var row = document.getElementById('removeFormRow_' + batchId);
+        if (row) row.style.display = (row.style.display === 'none' ? 'table-row' : 'none');
+    }
+
+    function confirmRemoveBatch(itemId, batchId, maxQty) {
+        var qty    = parseFloat(document.getElementById('removeQty_'    + batchId).value);
+        var reason = document.getElementById('removeReason_' + batchId).value.trim();
+
+        if (!qty || qty <= 0)      { showToast('Please enter a valid quantity to remove.', 'danger'); return; }
+        if (qty > maxQty)          { showToast('Cannot remove more than the batch contains (' + maxQty + ').', 'danger'); return; }
+        if (!reason)               { showToast('Please enter a reason for removing this stock.', 'danger'); return; }
+
+        removeBatch(itemId, batchId, qty, reason);
+        showToast('Stock removed and recorded in the Waste Log.', 'success');
+        renderBatchesTable(itemId);
+        renderInventory();
+    }
+
+    // ─── Add New Stock Batch (inside edit modal) ──────────────────────
+    function addNewBatch() {
+        var id     = document.getElementById('editIngredientId').value;
+        var qty    = document.getElementById('newBatchQty').value;
+        var expiry = document.getElementById('newBatchExpiry').value;
+
+        if (!qty || parseFloat(qty) <= 0) { showToast('Please enter a valid quantity.', 'danger'); return; }
+        if (!expiry)                       { showToast('Please set an expiry date for this batch.', 'danger'); return; }
+
+        addStockBatch(id, parseFloat(qty), expiry);
+        showToast('New stock batch added successfully.', 'success');
+        renderBatchesTable(id);
+        document.getElementById('newBatchQty').value    = '';
+        document.getElementById('newBatchExpiry').value = '';
+        renderInventory();
+    }
+
+    // ─── Save Ingredient Details ──────────────────────────────────────
     function saveIngredient() {
-        const id = document.getElementById('editIngredientId').value;
-        const data = {
-            name: document.getElementById('ingName').value.trim(),
-            category: document.getElementById('ingCategory').value,
-            quantity: document.getElementById('ingQuantity').value,
-            unit: document.getElementById('ingUnit').value,
-            costPerUnit: document.getElementById('ingCostPerUnit').value,
+        var id = document.getElementById('editIngredientId').value;
+        var data = {
+            name:              document.getElementById('ingName').value.trim(),
+            category:          document.getElementById('ingCategory').value,
+            unit:              document.getElementById('ingUnit').value,
+            costPerUnit:       document.getElementById('ingCostPerUnit').value,
             lowStockThreshold: document.getElementById('ingThreshold').value
         };
-        if (!data.name || !data.category || data.quantity==='' || data.costPerUnit==='') {
-            showToast('Please fill all required fields.','danger'); return;
+
+        if (!data.name || !data.category || data.costPerUnit === '') {
+            showToast('Please fill all required fields.', 'danger'); return;
         }
-        if (id) { updateIngredient(id, data); showToast(data.name + ' updated.','success'); }
-        else { addIngredient(data); showToast(data.name + ' added to inventory.','success'); }
+
+        if (id) {
+            // EDIT mode — save details only; quantity managed via batches
+            updateIngredient(id, data);
+            showToast(data.name + ' details updated.', 'success');
+        } else {
+            // ADD mode — include initial quantity + expiry
+            data.quantity   = document.getElementById('ingQuantity').value;
+            data.expiryDate = document.getElementById('ingExpiryDate').value;
+
+            if (!data.quantity || parseFloat(data.quantity) <= 0) {
+                showToast('Please enter a valid initial quantity.', 'danger'); return;
+            }
+            if (!data.expiryDate) {
+                showToast('Please set an expiry date for the first batch.', 'danger'); return;
+            }
+            addIngredient(data);
+            showToast(data.name + ' added to inventory.', 'success');
+        }
+
         bootstrap.Modal.getInstance(document.getElementById('ingredientModal')).hide();
         renderInventory();
     }
 
+    // ─── Delete Ingredient ────────────────────────────────────────────
     function confirmDelete(id, name) {
-        if (confirm('Delete "' + name + '" from inventory?')) {
-            deleteIngredient(id); showToast(name + ' removed.','danger'); renderInventory();
+        if (confirm('Delete "' + name + '" from inventory?\n\nAll batches for this ingredient will be permanently removed.')) {
+            deleteIngredient(id);
+            showToast(name + ' removed from inventory.', 'danger');
+            renderInventory();
         }
     }
 
+    // ─── Purchase Order ───────────────────────────────────────────────
     function openPurchaseOrder() {
-        const po = generatePurchaseOrder();
-        const body = document.getElementById('poBody');
+        var po   = generatePurchaseOrder();
+        var body = document.getElementById('poBody');
         if (!po.length) {
-            body.innerHTML = '<div class="empty-state"><span class="empty-state-icon">✅</span><p>All stock levels healthy. No purchase order needed.</p></div>';
+            body.innerHTML = '<div class="empty-state"><span class="empty-state-icon">✅</span><p>All stock levels are healthy. No purchase order needed.</p></div>';
         } else {
-            const total = po.reduce((s,i)=>s+i.estimatedCost,0);
-            body.innerHTML = `<div class="table-responsive"><table class="tbl">
-                <thead><tr><th>Item</th><th>Category</th><th>Current</th><th>Order Qty</th><th>Est. Cost</th></tr></thead>
-                <tbody>${po.map(i=>`<tr><td><strong>${i.name}</strong></td><td>${i.category}</td><td>${i.quantity} ${i.unit}</td><td class="text-amber fw-600">${i.requiredQty} ${i.unit}</td><td>${formatCurrency(i.estimatedCost)}</td></tr>`).join('')}</tbody>
-                <tfoot><tr><td colspan="4" class="text-end fw-600" style="border:none">Total:</td><td class="fw-600 text-blue" style="border:none">${formatCurrency(total)}</td></tr></tfoot>
-            </table></div>`;
+            var total = po.reduce(function (s, i) { return s + i.estimatedCost; }, 0);
+            body.innerHTML = '<div class="table-responsive"><table class="tbl">' +
+                '<thead><tr><th>Item</th><th>Category</th><th>Current Stock</th><th>Order Qty</th><th>Est. Cost</th></tr></thead>' +
+                '<tbody>' + po.map(function (i) {
+                    return '<tr><td><strong>' + i.name + '</strong></td><td>' + i.category + '</td><td>' + i.quantity + ' ' + i.unit + '</td>' +
+                        '<td class="text-amber fw-600">' + i.requiredQty + ' ' + i.unit + '</td><td>' + formatCurrency(i.estimatedCost) + '</td></tr>';
+                }).join('') + '</tbody>' +
+                '<tfoot><tr><td colspan="4" class="text-end fw-600" style="border:none">Total Estimated Cost:</td>' +
+                '<td class="fw-600 text-blue" style="border:none">' + formatCurrency(total) + '</td></tr></tfoot>' +
+                '</table></div>';
         }
         new bootstrap.Modal(document.getElementById('purchaseOrderModal')).show();
     }

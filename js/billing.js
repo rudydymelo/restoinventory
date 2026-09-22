@@ -16,7 +16,7 @@ function checkStockAvailability(recipeId, qty) {
     const shortages = [];
 
     for (const ing of recipe.ingredients) {
-        const invItem = getIngredientById(ing.inventoryId);
+        const invItem  = getIngredientById(ing.inventoryId);
         const required = ing.qtyRequired * qty;
 
         if (!invItem) {
@@ -26,11 +26,11 @@ function checkStockAvailability(recipeId, qty) {
 
         if (invItem.quantity < required) {
             shortages.push({
-                name: invItem.name,
-                unit: invItem.unit,
+                name:      invItem.name,
+                unit:      invItem.unit,
                 required,
                 available: invItem.quantity,
-                shortBy: required - invItem.quantity
+                shortBy:   required - invItem.quantity
             });
         }
     }
@@ -39,7 +39,7 @@ function checkStockAvailability(recipeId, qty) {
         const msgs = shortages.map(s => `${s.name} short by ${s.shortBy}${s.unit}`);
         return {
             available: false,
-            message: `Cannot prepare ${recipe.dishName}: ${msgs.join(', ')}`,
+            message:   `Cannot prepare ${recipe.dishName}: ${msgs.join(', ')}`,
             shortages
         };
     }
@@ -48,7 +48,8 @@ function checkStockAvailability(recipeId, qty) {
 }
 
 /**
- * Deduct ingredient quantities for a dish × qty and fire low-stock toasts.
+ * Deduct ingredient quantities for a dish × qty using FIFO batch deduction,
+ * and fire low-stock toasts for any ingredient that drops below its threshold.
  * @param {string} recipeId
  * @param {number} qty
  */
@@ -62,20 +63,25 @@ function deductStockAndNotify(recipeId, qty) {
         const invItem = getIngredientById(ing.inventoryId);
         if (!invItem) continue;
 
-        const newQty = Math.max(0, invItem.quantity - (ing.qtyRequired * qty));
-        Storage.updateItem('inventory', ing.inventoryId, { quantity: newQty });
+        // FIFO batch deduction (defined in inventory.js)
+        deductFromBatches(ing.inventoryId, ing.qtyRequired * qty);
 
-        if (newQty < (invItem.lowStockThreshold || 50)) {
-            alerts.push(invItem.name);
+        // Re-fetch updated quantity to check threshold
+        const refreshed = getIngredientById(ing.inventoryId);
+        if (refreshed && refreshed.quantity < (refreshed.lowStockThreshold || 50)) {
+            alerts.push({ name: refreshed.name, qty: refreshed.quantity, unit: refreshed.unit });
         }
     }
 
     // Fire low-stock toasts
-    alerts.forEach(name => {
-        showToast(`⚠️ Low Stock Alert: ${name} is running low!`, 'warning');
+    alerts.forEach(a => {
+        showToast(`⚠️ Low Stock: "${a.name}" is running low (${a.qty} ${a.unit} remaining).`, 'warning');
     });
 
-    logActivity('stock', `Stock deducted for ${qty}× ${recipe.dishName}`, { recipeId, qty });
+    logActivity('stock',
+        `Ingredients deducted for cooking: ${qty}× "${recipe.dishName}" prepared — stock reduced for ${recipe.ingredients.length} ingredient(s).`,
+        { recipeId, dishName: recipe.dishName, qty }
+    );
 }
 
 /**
@@ -85,8 +91,8 @@ function deductStockAndNotify(recipeId, qty) {
  */
 function calculateTotal(items) {
     const subtotal = items.reduce((sum, item) => sum + (item.priceAtSale * item.qty), 0);
-    const tax = Math.round(subtotal * 0.05 * 100) / 100;  // 5% GST
-    const total = Math.round((subtotal + tax) * 100) / 100;
+    const tax      = Math.round(subtotal * 0.05 * 100) / 100;  // 5% GST
+    const total    = Math.round((subtotal + tax) * 100) / 100;
     return { subtotal, tax, total };
 }
 
@@ -98,10 +104,15 @@ function calculateTotal(items) {
 function createBill(billData) {
     billData.timestamp = new Date().toISOString();
     const bill = Storage.addItem('bills', billData);
-    logActivity('billing', `Bill #${bill.id} created for Table ${billData.tableNumber} — Total: ${formatCurrency(billData.total)}`, {
-        billId: bill.id,
-        total: billData.total
-    });
+
+    const itemsSummary = billData.items
+        .map(i => `${i.qty}× ${i.dishName} (${formatCurrency(i.priceAtSale)} each)`)
+        .join('; ');
+
+    logActivity('billing',
+        `New bill created for Table ${billData.tableNumber} — ${billData.items.length} item(s): ${itemsSummary}. Subtotal: ${formatCurrency(billData.subtotal)}, Tax (5% GST): ${formatCurrency(billData.tax)}, Total Charged: ${formatCurrency(billData.total)}.`,
+        { billId: bill.id, tableNumber: billData.tableNumber, total: billData.total }
+    );
     return bill;
 }
 

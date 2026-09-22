@@ -8,6 +8,30 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <style>
+        .log-badge-billing { background: #0d6efd22; color: #4dabf7; border: 1px solid #0d6efd55; }
+        .log-badge-stock   { background: #19875422; color: #51cf66; border: 1px solid #19875455; }
+        .log-badge-menu    { background: #9c36b522; color: #cc5de8; border: 1px solid #9c36b555; }
+        .log-badge-waste   { background: #e0302422; color: #ff6b6b; border: 1px solid #e0302455; }
+        .log-type-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+        .log-action-text {
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        .log-timestamp {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body>
 <div class="app-layout">
@@ -18,7 +42,7 @@
 
             <div class="page-header">
                 <h1>Activity Logs</h1>
-                <p>View billing history, menu audits, and stock change records</p>
+                <p>Full history of billing, menu changes, stock movements, and waste events</p>
             </div>
 
             <div class="card-dark">
@@ -39,18 +63,26 @@
                             <i class="bi bi-box-seam me-1"></i> Stock History
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabWaste" type="button" role="tab">
+                            <i class="bi bi-trash3 me-1"></i> Waste Events
+                        </button>
+                    </li>
                 </ul>
 
                 <!-- Tab Content -->
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabBilling" role="tabpanel">
-                        <div class="table-responsive" id="billingLogsContainer"></div>
+                        <div id="billingLogsContainer"></div>
                     </div>
                     <div class="tab-pane fade" id="tabMenu" role="tabpanel">
-                        <div class="table-responsive" id="menuLogsContainer"></div>
+                        <div id="menuLogsContainer"></div>
                     </div>
                     <div class="tab-pane fade" id="tabStock" role="tabpanel">
-                        <div class="table-responsive" id="stockLogsContainer"></div>
+                        <div id="stockLogsContainer"></div>
+                    </div>
+                    <div class="tab-pane fade" id="tabWaste" role="tabpanel">
+                        <div id="wasteLogsContainer"></div>
                     </div>
                 </div>
             </div>
@@ -65,31 +97,69 @@
 <script src="js/app.js"></script>
 <script src="js/logs.js"></script>
 <script>
+    // Badge config per category
+    const LOG_META = {
+        billing: { label: '💳 Billing',     cssClass: 'log-badge-billing' },
+        menu:    { label: '📋 Menu',         cssClass: 'log-badge-menu'    },
+        stock:   { label: '📦 Stock',        cssClass: 'log-badge-stock'   },
+        waste:   { label: '🗑️ Waste',        cssClass: 'log-badge-waste'   }
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
         if (!requireAuth()) return;
         renderNavbar('Activity Logs');
         renderLogs('billing', 'billingLogsContainer');
-        renderLogs('menu', 'menuLogsContainer');
-        renderLogs('stock', 'stockLogsContainer');
+        renderLogs('menu',    'menuLogsContainer');
+        renderLogs('stock',   'stockLogsContainer');
+        renderLogs('waste',   'wasteLogsContainer');
     });
 
     function renderLogs(category, containerId) {
         const logs = getLogsByCategory(category);
-        const el = document.getElementById(containerId);
+        const el   = document.getElementById(containerId);
+        const meta = LOG_META[category] || { label: category, cssClass: '' };
 
         if (!logs.length) {
-            el.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📋</span><p>No ' + category + ' logs recorded yet.</p></div>';
+            el.innerHTML = `<div class="empty-state">
+                <span class="empty-state-icon">📋</span>
+                <p>No ${category} activity recorded yet.</p>
+            </div>`;
             return;
         }
 
-        el.innerHTML = `<table class="tbl">
-            <thead><tr><th>Timestamp</th><th>Action</th><th>Details</th></tr></thead>
-            <tbody>${logs.map(log => `<tr>
-                <td class="small" style="color:var(--text-muted);white-space:nowrap;">${formatDate(log.timestamp)}</td>
-                <td>${log.actionText}</td>
-                <td class="small" style="color:var(--text-muted)">${log.payload && Object.keys(log.payload).length ? JSON.stringify(log.payload) : '—'}</td>
-            </tr>`).join('')}</tbody>
-        </table>`;
+        const rows = logs.map(log => {
+            const badge = `<span class="log-type-badge ${meta.cssClass}">${meta.label}</span>`;
+            return `
+            <tr>
+                <td class="log-timestamp" style="vertical-align:top;padding-top:14px;">${formatDate(log.timestamp)}</td>
+                <td style="vertical-align:top;padding-top:12px;">${badge}</td>
+                <td class="log-action-text">${escapeHtml(log.actionText)}</td>
+            </tr>`;
+        }).join('');
+
+        el.innerHTML = `
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th style="width:160px">Date &amp; Time</th>
+                        <th style="width:120px">Type</th>
+                        <th>What Happened</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    /** Safely escape HTML so log text cannot inject markup. */
+    function escapeHtml(str) {
+        if (!str) return '—';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 </script>
 </body>
